@@ -19,7 +19,7 @@ connectDB();
 // Routes
 app.use("/api/status", statusRoutes);
 
-app.get((req, res) => {
+app.get("/", (req, res) => {
   res.send("Status website is working");
 });
 
