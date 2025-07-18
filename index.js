@@ -19,6 +19,10 @@ connectDB();
 // Routes
 app.use("/api/status", statusRoutes);
 
+app.get((req, res) => {
+  res.send("Status website is working");
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
