@@ -3,11 +3,7 @@ const WebSocket = require("ws");
 const Service = require("../models/service.model");
 
 const services = [
-  {
-    name: "Live API",
-    url: "https://liveapi.weeam.info",
-    method: "GET",
-  },
+  { name: "Live API", url: "https://liveapi.weeam.info", method: "GET" },
   {
     name: "Python Notifications",
     url: "https://pylive.weeam.info",
@@ -24,23 +20,6 @@ const services = [
     method: "GET",
   },
 ];
-
-const checkServices = async () => {
-  for (const service of services) {
-    const start = Date.now();
-    try {
-      if (service.method === "WS") {
-        await checkWebSocket(service.url);
-      } else {
-        await axios.get(service.url, { timeout: 2000 });
-      }
-
-      await saveStatus(service.name, service.url, "Up", Date.now() - start);
-    } catch {
-      await saveStatus(service.name, service.url, "Down", null);
-    }
-  }
-};
 
 const checkWebSocket = (url) => {
   return new Promise((resolve, reject) => {
@@ -73,6 +52,27 @@ const saveStatus = async (name, url, status, responseTime) => {
   });
 };
 
-module.exports = () => {
-  setInterval(checkServices, 1000); 
+const checkServices = async () => {
+  for (const service of services) {
+    const start = Date.now();
+    try {
+      if (service.method === "WS") {
+        await checkWebSocket(service.url);
+      } else {
+        await axios.get(service.url, { timeout: 2000 });
+      }
+
+      await saveStatus(service.name, service.url, "Up", Date.now() - start);
+    } catch {
+      await saveStatus(service.name, service.url, "Down", null);
+    }
+  }
+};
+
+module.exports = {
+  startScheduler: () => {
+    setInterval(checkServices, 60 * 60 * 1000);
+    checkServices();
+  },
+  runCheckNow: checkServices,
 };

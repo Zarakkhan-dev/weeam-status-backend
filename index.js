@@ -28,5 +28,5 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-// Start monitoring every second
-monitor();
+// Start monitoring every one hour
+monitor.startScheduler();
