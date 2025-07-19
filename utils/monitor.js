@@ -4,22 +4,13 @@ const Service = require("../models/service.model");
 
 const services = [
   { name: "Live API", url: "https://liveapi.weeam.info", method: "GET" },
-  {
-    name: "Python Notifications",
-    url: "https://pylive.weeam.info",
-    method: "GET",
-  },
-  {
-    name: "WebSocket Server",
-    url: "wss://pylive.weeam.info/ws/12",
-    method: "WS",
-  },
-  {
-    name: "SIP_WebRTC Server",
-    url: "https://webrtc.weeam.info/ping",
-    method: "GET",
-  },
+  { name: "Python Notifications", url: "https://pylive.weeam.info", method: "GET" },
+  { name: "WebSocket Server", url: "wss://pylive.weeam.info/ws/12", method: "WS" },
+  { name: "SIP_WebRTC Server", url: "https://webrtc.weeam.info/ping", method: "GET" },
 ];
+
+// Track ongoing downtimes
+const ongoingDowntimes = {};
 
 const checkWebSocket = (url) => {
   return new Promise((resolve, reject) => {
@@ -35,44 +26,70 @@ const checkWebSocket = (url) => {
       resolve();
     });
 
-    ws.on("error", () => {
+    ws.on("error", (err) => {
       clearTimeout(timeout);
-      reject();
+      reject(err);
     });
   });
 };
 
-const saveStatus = async (name, url, status, responseTime) => {
-  await Service.create({
+const saveStatus = async (name, status, responseTime, isClientTriggered = false) => {
+  const timestamp = new Date();
+  const record = await Service.create({
     serviceName: name,
-    url,
     status,
     responseTime,
-    timestamp: new Date(),
+    timestamp,
+    isClientTriggered,
   });
+
+  // Track downtimes
+  if (status === "Down") {
+    if (!ongoingDowntimes[name]) {
+      ongoingDowntimes[name] = { start: timestamp };
+    }
+  } else {
+    if (ongoingDowntimes[name]) {
+      const downtime = {
+        ...ongoingDowntimes[name],
+        end: timestamp,
+        duration: timestamp - ongoingDowntimes[name].start
+      };
+      // Here you could save the downtime to a separate collection if needed
+      delete ongoingDowntimes[name];
+    }
+  }
+
+  return record;
 };
 
-const checkServices = async () => {
-  for (const service of services) {
-    const start = Date.now();
-    try {
-      if (service.method === "WS") {
-        await checkWebSocket(service.url);
-      } else {
-        await axios.get(service.url, { timeout: 2000 });
-      }
-
-      await saveStatus(service.name, service.url, "Up", Date.now() - start);
-    } catch {
-      await saveStatus(service.name, service.url, "Down", null);
+const checkService = async (service) => {
+  const start = Date.now();
+  try {
+    if (service.method === "WS") {
+      await checkWebSocket(service.url);
+    } else {
+      await axios.get(service.url, { timeout: 2000 });
     }
+    return { status: "Up", responseTime: Date.now() - start };
+  } catch (error) {
+    console.error(`Error checking ${service.name}:`, error.message);
+    return { status: "Down", responseTime: null };
+  }
+};
+
+const checkServices = async (isClientTriggered = false) => {
+  for (const service of services) {
+    const { status, responseTime } = await checkService(service);
+    await saveStatus(service.name, status, responseTime, isClientTriggered);
   }
 };
 
 module.exports = {
   startScheduler: () => {
-    setInterval(checkServices, 60 * 60 * 1000);
-    checkServices();
+    // Check every 5 minutes
+    setInterval(() => checkServices(false), 5 * 60 * 1000);
+    checkServices(false);
   },
-  runCheckNow: checkServices,
+  runCheckNow: (isClientTriggered = false) => checkServices(isClientTriggered)
 };
