@@ -2,6 +2,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const statusRoutes = require("./routes/status.routes");
+const authRoute = require("./routes/auth.routes")
+const incidentRoute = require("./routes/incidents.routes")
 const monitor = require("./utils/monitor");
 require("dotenv").config();
 
@@ -18,7 +20,8 @@ connectDB();
 
 // Routes
 app.use("/api/status", statusRoutes);
-
+app.use("/api/auth", authRoute)
+app.use("/api/incidents",incidentRoute)
 app.get("/", (req, res) => {
   res.send("Status website is working");
 });
